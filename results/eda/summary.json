@@ -1,0 +1,124 @@
+{
+  "annotations_file": "data\\processed\\annotations.csv",
+  "images_dir": "data\\raw",
+  "num_rows": 4859,
+  "num_unique_images": 4859,
+  "num_classes": 3,
+  "class_distribution": {
+    "negative": 1085,
+    "neutral": 3242,
+    "positive": 532
+  },
+  "split_distribution": {},
+  "missing_image_count": 0,
+  "missing_image_examples": [],
+  "duplicate_summary": {
+    "duplicate_image_rows": 0,
+    "duplicate_image_files": 0,
+    "duplicate_examples": {}
+  },
+  "image_stats": {
+    "count": 256,
+    "avg_width": 549.30859375,
+    "avg_height": 541.6640625,
+    "median_width": 600.0,
+    "median_height": 496.0,
+    "avg_aspect_ratio": 1.152271970659713,
+    "median_file_size_kb": 41.1484375,
+    "min_width": 80,
+    "max_width": 600,
+    "min_height": 80,
+    "max_height": 1199
+  },
+  "text_stats": {
+    "num_texts": 4859,
+    "avg_tokens_per_text": 13.12965630788228,
+    "median_tokens_per_text": 13.0,
+    "top_words": [
+      {
+        "token": "rt",
+        "count": 2080
+      },
+      {
+        "token": "http",
+        "count": 1779
+      },
+      {
+        "token": "love",
+        "count": 182
+      },
+      {
+        "token": "new",
+        "count": 160
+      },
+      {
+        "token": "happy",
+        "count": 148
+      },
+      {
+        "token": "day",
+        "count": 146
+      },
+      {
+        "token": "like",
+        "count": 136
+      },
+      {
+        "token": "just",
+        "count": 135
+      },
+      {
+        "token": "black",
+        "count": 126
+      },
+      {
+        "token": "today",
+        "count": 123
+      },
+      {
+        "token": "https",
+        "count": 83
+      },
+      {
+        "token": "night",
+        "count": 83
+      },
+      {
+        "token": "quiz",
+        "count": 82
+      },
+      {
+        "token": "abandoned",
+        "count": 77
+      },
+      {
+        "token": "finished",
+        "count": 74
+      },
+      {
+        "token": "got",
+        "count": 74
+      },
+      {
+        "token": "man",
+        "count": 72
+      },
+      {
+        "token": "time",
+        "count": 71
+      },
+      {
+        "token": "life",
+        "count": 69
+      },
+      {
+        "token": "passionate",
+        "count": 69
+      }
+    ]
+  },
+  "artifacts": {
+    "sentiment_distribution": "results\\eda\\sentiment_distribution.png",
+    "image_samples": "results\\eda\\image_samples.png"
+  }
+}

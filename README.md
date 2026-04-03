@@ -1,7 +1,7 @@
-# Image-Based Sentiment Analysis
+#  Sentiment Analysis
 
 ## Topic  
-Image-Based Sentiment Analysis using Deep Learning
+Sentiment Analysis of Image using Deep Learning
 
 ---
 
