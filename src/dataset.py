@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import matplotlib.pyplot as plt
 
+
 LABEL_MAP = {
     "negative": 0,
     "neutral": 1,
@@ -21,12 +22,6 @@ LABEL_MAP = {
 def load_config(config_path: str = "configs/base.yaml") -> Dict:
     """
     Load YAML configuration file.
-
-    Args:
-        config_path: Relative path to config file from project root.
-
-    Returns:
-        Parsed config dictionary.
     """
     project_root = Path(__file__).resolve().parents[1]
     full_config_path = project_root / config_path
@@ -76,13 +71,6 @@ def validate_config(config: Dict) -> None:
 def load_annotations(config: Dict) -> pd.DataFrame:
     """
     Load and validate annotation CSV, map labels, and build full image paths.
-
-    Returns:
-        DataFrame with columns:
-        - image_path
-        - sentiment
-        - label
-        - full_image_path
     """
     project_root = Path(__file__).resolve().parents[1]
     annotations_path = project_root / config["data"]["annotations"]
@@ -99,11 +87,9 @@ def load_annotations(config: Dict) -> pd.DataFrame:
 
     df = df[["image_path", "sentiment"]].copy()
 
-    # Clean string columns
     df["image_path"] = df["image_path"].astype(str).str.strip()
     df["sentiment"] = df["sentiment"].astype(str).str.strip().str.lower()
 
-    # Map sentiment labels
     df["label"] = df["sentiment"].map(LABEL_MAP)
 
     invalid_labels = df[df["label"].isna()]["sentiment"].unique().tolist()
@@ -113,7 +99,6 @@ def load_annotations(config: Dict) -> pd.DataFrame:
     raw_root = project_root / config["data"]["raw_root"]
     df["full_image_path"] = df["image_path"].apply(lambda x: raw_root / x)
 
-    # Filter only existing image files
     missing_files = df[~df["full_image_path"].apply(lambda x: x.exists())]
     if not missing_files.empty:
         print(f"Warning: {len(missing_files)} image files are missing and will be removed.")
@@ -131,7 +116,7 @@ def split_data(
     df: pd.DataFrame,
     val_split: float,
     test_split: float,
-    seed: int
+    seed: int,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Split dataset into train, validation, and test with stratification.
@@ -163,7 +148,7 @@ def save_split_csvs(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
     test_df: pd.DataFrame,
-    config: Dict
+    config: Dict,
 ) -> None:
     """
     Save split CSVs for reproducibility.
@@ -180,7 +165,7 @@ def save_split_csvs(
 def print_split_summary(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
-    test_df: pd.DataFrame
+    test_df: pd.DataFrame,
 ) -> None:
     """
     Print sizes and label distribution for each split.
@@ -197,8 +182,127 @@ def print_split_summary(
     print("\n===== DATA SPLIT SUMMARY =====")
     summarize_split("Train", train_df)
     summarize_split("Validation", val_df)
-    summarize_split("Test", test_df) 
-    
+    summarize_split("Test", test_df)
+
+
+def create_split_summary_table(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    config: Dict,
+) -> None:
+    """
+    Create and save a summary table for train/validation/test splits,
+    including total split size, class counts, and percentages.
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    processed_root = project_root / config["data"]["processed_root"]
+    processed_root.mkdir(parents=True, exist_ok=True)
+
+    split_dict = {
+        "Train": train_df,
+        "Validation": val_df,
+        "Test": test_df,
+    }
+
+    rows = []
+
+    for split_name, split_df in split_dict.items():
+        total_size = len(split_df)
+        counts = split_df["sentiment"].value_counts()
+        percentages = split_df["sentiment"].value_counts(normalize=True) * 100
+
+        for label in ["negative", "neutral", "positive"]:
+            rows.append({
+                "split": split_name,
+                "split_size": total_size,
+                "class": label,
+                "count": counts.get(label, 0),
+                "percentage": round(percentages.get(label, 0), 2),
+            })
+
+    summary_df = pd.DataFrame(rows)
+
+    print("\n===== SPLIT SUMMARY TABLE =====")
+    print(summary_df)
+
+    output_path = processed_root / "split_summary_table.csv"
+    summary_df.to_csv(output_path, index=False)
+    print(f"\nSaved split summary table to: {output_path}")
+
+
+def plot_split_distributions(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    config: Dict,
+) -> None:
+    """
+    Plot and save class distribution across train, validation, and test splits,
+    showing both counts and percentages on the bars.
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    figures_dir = project_root / "results" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    split_names = ["Train", "Validation", "Test"]
+    split_dfs = [train_df, val_df, test_df]
+    class_labels = ["negative", "neutral", "positive"]
+    colors = ["red", "gray", "green"]
+
+    counts = {
+        split_name: [split_df["sentiment"].value_counts().get(label, 0) for label in class_labels]
+        for split_name, split_df in zip(split_names, split_dfs)
+    }
+
+    percentages = {
+        split_name: [
+            split_df["sentiment"].value_counts(normalize=True).get(label, 0) * 100
+            for label in class_labels
+        ]
+        for split_name, split_df in zip(split_names, split_dfs)
+    }
+
+    x = range(len(split_names))
+    width = 0.22
+
+    plt.figure(figsize=(10, 6))
+
+    for i, (label, color) in enumerate(zip(class_labels, colors)):
+        bar_positions = [pos + (i - 1) * width for pos in x]
+        bar_heights = [counts[split][i] for split in split_names]
+        bar_percentages = [percentages[split][i] for split in split_names]
+
+        bars = plt.bar(
+            bar_positions,
+            bar_heights,
+            width=width,
+            label=label.capitalize(),
+            color=color,
+        )
+
+        for bar, pct in zip(bars, bar_percentages):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 20,
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+    plt.xticks(list(x), split_names)
+    plt.ylabel("Number of Samples")
+    plt.title("Class Distribution Across Data Splits (Count and Percentage)")
+    plt.legend()
+    plt.tight_layout()
+
+    output_path = figures_dir / "split_distribution.png"
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+
+    print(f"\nSaved split distribution plot to: {output_path}")
+
 
 def get_transforms(config: Dict):
     """
@@ -278,7 +382,9 @@ def get_dataloaders(config_path: str = "configs/base.yaml"):
 
     if config.get("debug", {}).get("print_split_summary", False):
         print_split_summary(train_df, val_df, test_df)
-        plot_split_distributions(train_df, val_df, test_df, config)
+
+    create_split_summary_table(train_df, val_df, test_df, config)
+    plot_split_distributions(train_df, val_df, test_df, config)
 
     train_transform, eval_transform = get_transforms(config)
 
@@ -314,73 +420,6 @@ def get_dataloaders(config_path: str = "configs/base.yaml"):
 
     return train_loader, val_loader, test_loader
 
-def plot_split_distributions(train_df, val_df, test_df, config):
-    """
-    Plot and save class distribution across train, validation, and test splits,
-    showing both counts and percentages on the bars.
-    """
-    project_root = Path(__file__).resolve().parents[1]
-    figures_dir = project_root / "results" / "figures"
-    figures_dir.mkdir(parents=True, exist_ok=True)
-
-    split_names = ["Train", "Validation", "Test"]
-    split_dfs = [train_df, val_df, test_df]
-    class_labels = ["negative", "neutral", "positive"]
-    colors = ["red", "gray", "green"]
-
-    counts = {
-        split_name: [split_df["sentiment"].value_counts().get(label, 0) for label in class_labels]
-        for split_name, split_df in zip(split_names, split_dfs)
-    }
-
-    percentages = {
-        split_name: [
-            split_df["sentiment"].value_counts(normalize=True).get(label, 0) * 100
-            for label in class_labels
-        ]
-        for split_name, split_df in zip(split_names, split_dfs)
-    }
-
-    x = range(len(split_names))
-    width = 0.22
-
-    plt.figure(figsize=(10, 6))
-
-    for i, (label, color) in enumerate(zip(class_labels, colors)):
-        bar_positions = [pos + (i - 1) * width for pos in x]
-        bar_heights = [counts[split][i] for split in split_names]
-        bar_percentages = [percentages[split][i] for split in split_names]
-
-        bars = plt.bar(
-            bar_positions,
-            bar_heights,
-            width=width,
-            label=label.capitalize(),
-            color=color
-        )
-
-        # Add percentage labels above each bar
-        for bar, pct in zip(bars, bar_percentages):
-            plt.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height() + 20,
-                f"{pct:.1f}%",
-                ha="center",
-                va="bottom",
-                fontsize=9
-            )
-
-    plt.xticks(list(x), split_names)
-    plt.ylabel("Number of Samples")
-    plt.title("Class Distribution Across Data Splits (Count and Percentage)")
-    plt.legend()
-    plt.tight_layout()
-
-    output_path = figures_dir / "split_distribution.png"
-    plt.savefig(output_path, dpi=300)
-    plt.show()
-
-    print(f"\nSaved split distribution plot to: {output_path}")
 
 def main():
     """
