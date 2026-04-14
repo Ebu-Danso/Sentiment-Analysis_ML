@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-
+import matplotlib.pyplot as plt
 
 LABEL_MAP = {
     "negative": 0,
@@ -197,8 +197,8 @@ def print_split_summary(
     print("\n===== DATA SPLIT SUMMARY =====")
     summarize_split("Train", train_df)
     summarize_split("Validation", val_df)
-    summarize_split("Test", test_df)
-
+    summarize_split("Test", test_df) 
+    
 
 def get_transforms(config: Dict):
     """
@@ -278,6 +278,7 @@ def get_dataloaders(config_path: str = "configs/base.yaml"):
 
     if config.get("debug", {}).get("print_split_summary", False):
         print_split_summary(train_df, val_df, test_df)
+        plot_split_distributions(train_df, val_df, test_df, config)
 
     train_transform, eval_transform = get_transforms(config)
 
@@ -313,6 +314,73 @@ def get_dataloaders(config_path: str = "configs/base.yaml"):
 
     return train_loader, val_loader, test_loader
 
+def plot_split_distributions(train_df, val_df, test_df, config):
+    """
+    Plot and save class distribution across train, validation, and test splits,
+    showing both counts and percentages on the bars.
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    figures_dir = project_root / "results" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    split_names = ["Train", "Validation", "Test"]
+    split_dfs = [train_df, val_df, test_df]
+    class_labels = ["negative", "neutral", "positive"]
+    colors = ["red", "gray", "green"]
+
+    counts = {
+        split_name: [split_df["sentiment"].value_counts().get(label, 0) for label in class_labels]
+        for split_name, split_df in zip(split_names, split_dfs)
+    }
+
+    percentages = {
+        split_name: [
+            split_df["sentiment"].value_counts(normalize=True).get(label, 0) * 100
+            for label in class_labels
+        ]
+        for split_name, split_df in zip(split_names, split_dfs)
+    }
+
+    x = range(len(split_names))
+    width = 0.22
+
+    plt.figure(figsize=(10, 6))
+
+    for i, (label, color) in enumerate(zip(class_labels, colors)):
+        bar_positions = [pos + (i - 1) * width for pos in x]
+        bar_heights = [counts[split][i] for split in split_names]
+        bar_percentages = [percentages[split][i] for split in split_names]
+
+        bars = plt.bar(
+            bar_positions,
+            bar_heights,
+            width=width,
+            label=label.capitalize(),
+            color=color
+        )
+
+        # Add percentage labels above each bar
+        for bar, pct in zip(bars, bar_percentages):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 20,
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=9
+            )
+
+    plt.xticks(list(x), split_names)
+    plt.ylabel("Number of Samples")
+    plt.title("Class Distribution Across Data Splits (Count and Percentage)")
+    plt.legend()
+    plt.tight_layout()
+
+    output_path = figures_dir / "split_distribution.png"
+    plt.savefig(output_path, dpi=300)
+    plt.show()
+
+    print(f"\nSaved split distribution plot to: {output_path}")
 
 def main():
     """
