@@ -9,9 +9,14 @@ from sklearn.metrics import classification_report, confusion_matrix
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from dataset import ImageSentimentDataset, INDEX_TO_SENTIMENT
-from model import build_resnet18, get_device
-from utils import load_config
+try:
+    from .dataset import ImageSentimentDataset, INDEX_TO_SENTIMENT
+    from .model import build_resnet18, get_device
+    from .utils import load_config
+except ImportError:
+    from dataset import ImageSentimentDataset, INDEX_TO_SENTIMENT
+    from model import build_resnet18, get_device
+    from utils import load_config
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--data_root", type=Path, default=Path("data/raw"))
-    parser.add_argument("--annotations", type=Path, required=True)
+    parser.add_argument("--annotations", type=Path, help="Path to annotations CSV for evaluation")
     return parser.parse_args()
 
 
@@ -33,8 +38,10 @@ def main() -> None:
         transforms.Normalize(mean=cfg.data.mean, std=cfg.data.std),
     ])
 
+    annotations_path = args.annotations or Path(cfg.data.test_annotations)
+    print(f"Evaluating on annotations: {annotations_path}")
     dataset = ImageSentimentDataset(
-        annotations_file=args.annotations,
+        annotations_file=annotations_path,
         root_dir=args.data_root,
         transform=transform,
     )
@@ -42,8 +49,26 @@ def main() -> None:
 
     device = get_device()
     model = build_resnet18(num_classes=cfg.model.num_classes, pretrained=False)
-    checkpoint = torch.load(args.checkpoint, map_location=device)
-    model.load_state_dict(checkpoint["model_state_dict"])
+    
+    # Load checkpoint with error handling
+    try:
+        checkpoint = torch.load(args.checkpoint, map_location=device)
+    except FileNotFoundError:
+        print(f"Error: Checkpoint file not found at {args.checkpoint}")
+        return
+    except Exception as e:
+        print(f"Error loading checkpoint: {e}")
+        return
+    
+    try:
+        model.load_state_dict(checkpoint["model_state_dict"])
+    except KeyError:
+        print("Error: 'model_state_dict' key not found in checkpoint")
+        return
+    except Exception as e:
+        print(f"Error loading model state: {e}")
+        return
+    
     model.to(device)
     model.eval()
 
