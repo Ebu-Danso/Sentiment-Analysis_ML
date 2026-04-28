@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -136,6 +138,9 @@ def main() -> None:
     checkpoint_path = args.save_dir / "best.pth"
     patience = getattr(cfg.training, "patience", 4)
     no_improve = 0
+    
+    # Track training history
+    training_history = {"epoch": [], "train_loss": [], "val_loss": []}
 
     for epoch in range(1, cfg.training.epochs + 1):
         model.train()
@@ -154,6 +159,11 @@ def main() -> None:
         val_loss = evaluate(model, val_loader, criterion, device)
         epoch_loss = running_loss / len(train_loader.dataset)
         print(f"Epoch {epoch}: train_loss={epoch_loss:.4f} val_loss={val_loss:.4f}")
+        
+        # Store training history
+        training_history["epoch"].append(epoch)
+        training_history["train_loss"].append(epoch_loss)
+        training_history["val_loss"].append(val_loss)
 
         scheduler.step(val_loss)
 
@@ -169,6 +179,35 @@ def main() -> None:
         if no_improve >= patience:
             print(f"Stopping early after {epoch} epochs.")
             break
+    
+    # Save training history to CSV
+    history_df = pd.DataFrame(training_history)
+    history_csv_path = Path("results/training_history.csv")
+    history_df.to_csv(history_csv_path, index=False)
+    print(f"\nTraining history saved to {history_csv_path}")
+    
+    # Create and save training validation loss curve
+    plt.figure(figsize=(10, 6))
+    plt.plot(training_history["epoch"], training_history["train_loss"], 
+             marker='o', label='Train Loss', linewidth=2, markersize=6)
+    plt.plot(training_history["epoch"], training_history["val_loss"], 
+             marker='s', label='Validation Loss', linewidth=2, markersize=6)
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.title('Training and Validation Loss Curve', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=11)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    # Ensure figures directory exists
+    figures_dir = Path("results/figures")
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save the figure
+    figure_path = figures_dir / "training_validation_loss_curve.png"
+    plt.savefig(figure_path, dpi=300, bbox_inches='tight')
+    print(f"Training loss curve saved to {figure_path}")
+    plt.close()
 
 
 def evaluate(model, dataloader, criterion, device) -> float:
