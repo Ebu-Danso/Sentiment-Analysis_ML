@@ -35,14 +35,18 @@ def main() -> None:
     cfg = load_config(args.config)
     set_seed(cfg.training.seed)
 
+    # Enhanced data augmentation with more regularization techniques
     transforms_train = transforms.Compose([
-        transforms.RandomResizedCrop((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(10),
+        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomVerticalFlip(p=0.2),
+        transforms.RandomRotation(15),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
         transforms.RandomApply(
             [transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)],
-            p=0.5,
+            p=0.6,
         ),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=3)], p=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean=cfg.data.mean, std=cfg.data.std),
     ])
@@ -103,11 +107,23 @@ def main() -> None:
     class_weights = class_weights / class_weights.mean()
     class_weights = class_weights.to(device)
     print(f"Using class weights: {class_weights.tolist()}")
-    model = build_resnet18(num_classes=cfg.model.num_classes, pretrained=cfg.model.pretrained)
+    
+    freeze_backbone = getattr(cfg.model, 'freeze_backbone', True)
+    model = build_resnet18(num_classes=cfg.model.num_classes, pretrained=cfg.model.pretrained, freeze_backbone=freeze_backbone)
     model.to(device)
+    
+    # Count trainable parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters: {total_params:,} | Trainable: {trainable_params:,}")
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = optim.Adam(model.parameters(), lr=cfg.training.lr)
+    
+    # Add weight decay (L2 regularization) to optimizer
+    weight_decay = getattr(cfg.training, 'weight_decay', 0.0)
+    optimizer = optim.Adam(model.parameters(), lr=cfg.training.lr, weight_decay=weight_decay)
+    print(f"Using optimizer: Adam with lr={cfg.training.lr}, weight_decay={weight_decay}")
+    
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode="min",

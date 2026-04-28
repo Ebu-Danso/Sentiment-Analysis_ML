@@ -1,5 +1,8 @@
 data:
   annotations: data/processed/annotations.csv
+  train_annotations: data/processed/train_split.csv
+  val_annotations: data/processed/val_split.csv
+  test_annotations: data/processed/test_split.csv
   raw_root: data/raw
   processed_root: data/processed
   mean: [0.485, 0.456, 0.406]
@@ -8,16 +11,18 @@ data:
 model:
   num_classes: 3
   pretrained: true
+  freeze_backbone: true  # Freeze early layers for better fine-tuning
 
 training:
   seed: 42
   batch_size: 32
   val_split: 0.2
-  epochs: 10
-  lr: 0.0001
+  epochs: 50  # Increased from 20
+  lr: 0.001  # Increased from 0.0003 for better convergence
   test_split: 0.1
-  epochs: 20
-  lr: 0.0003
+  weight_decay: 0.0005  # L2 regularization
+  scheduler_patience: 3  # ReduceLROnPlateau patience
+  patience: 8  # Early stopping patience (increased for more stable training)
 
 dataloader:
   num_workers: 0

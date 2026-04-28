@@ -18,6 +18,7 @@ LABEL_MAP = {
     "positive": 2,
 }
 
+SENTIMENT_TO_INDEX = LABEL_MAP
 INDEX_TO_SENTIMENT = {v: k for k, v in LABEL_MAP.items()}
 
 
@@ -82,8 +83,8 @@ def load_annotations(config: Dict) -> pd.DataFrame:
 
     df["image_path"] = df["image_path"].astype(str).str.strip()
     df["sentiment"] = df["sentiment"].astype(str).str.strip().str.lower()
-
     df["label"] = df["sentiment"].map(LABEL_MAP)
+    df["sentiment_idx"] = df["label"]
 
     invalid_labels = df[df["label"].isna()]["sentiment"].unique().tolist()
     if invalid_labels:
@@ -307,19 +308,17 @@ def get_transforms(config: Dict):
 
 
 class SentimentImageDataset(Dataset):
-    """
-    PyTorch Dataset for image-based sentiment classification.
-
-    Supports two usages:
-    1. SentimentImageDataset(dataframe, transform=...)
-    2. SentimentImageDataset(annotations_file=..., root_dir=..., transform=...)
-    """
-
     def __init__(self, dataframe=None, transform=None, annotations_file=None, root_dir=None, **kwargs):
         self.transform = transform
 
         if dataframe is not None:
-            self.dataframe = dataframe.copy()
+            df = dataframe.copy()
+
+            if "label" not in df.columns:
+                df["label"] = df["sentiment"].map(LABEL_MAP)
+
+            if "sentiment_idx" not in df.columns:
+                df["sentiment_idx"] = df["label"]
 
         elif annotations_file is not None and root_dir is not None:
             annotations_file = Path(annotations_file)
@@ -336,6 +335,7 @@ class SentimentImageDataset(Dataset):
             df["image_path"] = df["image_path"].astype(str).str.strip()
             df["sentiment"] = df["sentiment"].astype(str).str.strip().str.lower()
             df["label"] = df["sentiment"].map(LABEL_MAP)
+            df["sentiment_idx"] = df["label"]
 
             invalid_labels = df[df["label"].isna()]["sentiment"].unique().tolist()
             if invalid_labels:
@@ -349,12 +349,13 @@ class SentimentImageDataset(Dataset):
             if df.empty:
                 raise ValueError("No valid image files found for this dataset.")
 
-            self.dataframe = df
-
         else:
             raise ValueError(
                 "You must provide either dataframe=... or both annotations_file=... and root_dir=..."
             )
+
+        self.dataframe = df
+        self.annotations = df
 
     def __len__(self) -> int:
         return len(self.dataframe)
@@ -375,7 +376,6 @@ class SentimentImageDataset(Dataset):
         return image, label
 
 
-# Compatibility alias for older code in train.py/evaluate.py
 ImageSentimentDataset = SentimentImageDataset
 
 
@@ -411,27 +411,9 @@ def get_dataloaders(config_path: str = "configs/base.yaml"):
     num_workers = config.get("dataloader", {}).get("num_workers", 0)
     pin_memory = config.get("dataloader", {}).get("pin_memory", False)
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-    )
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
 
     return train_loader, val_loader, test_loader
 
